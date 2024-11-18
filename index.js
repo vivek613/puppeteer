@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer');
 
 (async () => {
-    const browser = await puppeteer.launch({ headless: false });
+    const browser = await puppeteer.launch({ headless: false });    
     const page = await browser.newPage();
 
     // Set the default navigation timeout to 60 seconds
@@ -9,22 +9,16 @@ const puppeteer = require('puppeteer');
 
     // Navigate to the login page
     await page.goto('https://appsumo.com/accounts/login/');
-    await page.screenshot({ path: "example.png" });
 
     // Perform login
     await page.type("#id_login", 'dev.hisaria@gmail.com', { delay: 100 });
     await page.type("#id_password", 'Test@123', { delay: 100 });
     await page.click("#login_submit_button");
 
-     // Wait for 2 seconds after clicking the login button
-    // Wait for the menu button and navigate to the account history page
-    // await page.waitForSelector('#headlessui-menu-button-\\:r0\\:');
-    // await page.waitForSelector('button[id="headlessui-menu-button-\\:r0\\:"]', { visible: true });
-    // await page.click('button[id="headlessui-menu-button-\\:r0\\:"]');
     await delay(2000);
 
       // Navigate directly to the history page
-      await page.goto('https://appsumo.com/account/history/', { waitUntil: 'networkidle0' });
+    await page.goto('https://appsumo.com/account/history/', { waitUntil: 'networkidle0' });
   
       if (page.url() !== 'https://appsumo.com/account/history/') {
         console.error('Failed to navigate to the history page.');
@@ -115,7 +109,6 @@ const puppeteer = require('puppeteer');
         await new Promise(resolve => setTimeout(resolve, 5000));
 
         const currentUrl = newPage.url();
-console.log("currentUrl",currentUrl)
         if (currentUrl.includes("https://appsumo.com/account/redemption/")) {
             try {
                 const productPageLink = await newPage.evaluate(() => {
@@ -129,6 +122,27 @@ console.log("currentUrl",currentUrl)
                 if (productPageLink) {
                     deal.identifier = productPageLink;
                     await newPage.goto(productPageLink, { waitUntil: 'networkidle0' });
+                }
+                if (productPageLink.includes("https://appsumo.com/products/")) {
+                    try {
+                        const productLink = await newPage.evaluate(() => {
+                    const section = document.querySelector("section.mt-3");
+
+                            if (section) {
+                                const links = section.querySelectorAll("a");
+                                if (links.length) {
+                                    return links[links.length - 1].getAttribute("href");
+                                }
+                            }
+                            return null;
+                        });
+                        console.log("productLink",productLink)
+                        if (productLink) {
+                            deal.Link_c = productLink;
+                        }
+                    } catch (error) {
+                        console.error('Error extracting product link:', error);
+                    }
                 }
             } catch (error) {
                 console.error('Error extracting product page link:', error);
@@ -162,6 +176,36 @@ console.log("currentUrl",currentUrl)
     // // Iterate over deals to fetch Link_c value
     for (let deal of deals) {
         await getLinkCValue(deal, browser);
+    }
+
+    const user_id = "V1lTEbwZv0gW66jaSbODIiQBTsr2"; // Replace with actual user ID
+    const post_data = {
+        "data": {
+            "userId": user_id,
+            "deals": deals
+        }
+    };
+
+    try {
+        const response = await fetch("https://us-central1-trackr-98e4b.cloudfunctions.net/onBulkImportFromAppsumo", {
+            method: 'POST',
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(post_data)
+        });
+
+        const response_data = await response.text();
+        console.log("ok");
+        console.log(response_data);
+        if (response_data !== "Internal Server Error") {
+            console.log('apiRequestSuccess');
+        } else {
+            console.log('apiRequestError');
+        }
+    } catch (error) {
+        console.log(error);
     }
 
     console.log(deals, deals.length);
